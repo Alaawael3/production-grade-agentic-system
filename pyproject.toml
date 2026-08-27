@@ -1,7 +1,12 @@
 [project]
 name = "production-grade-agentic-system"
 version = "0.1.0"
+authors = [
+    { name="Alaa Wael", email="alaawael1016@gmail.com" }
+]
 description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic-settings>=2.15.0",
+]
