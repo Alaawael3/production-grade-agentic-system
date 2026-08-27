@@ -158,8 +158,28 @@ def setup_logging() -> None:
     )
 
 
+setup_logging()
+
+logger = structlog.get_logger()
+
 def main():
     print(f"welcome from `{os.path.basename(__file__).split('.')[0]}` modeul, nothing to do ^___^!")
+    print(get_log_file_path())
+    logger.info(
+        "Logging_initialized",
+        environment=str(settings.APP_ENV),
+        log_level=str(settings.LOG_LEVEL),
+        log_renderer=str(settings.LOG_RENDERER),
+        debug=settings.DEBUG,
+    )
+
+    logger.debug(
+        "test_debug",
+        environment=str(settings.APP_ENV),
+        log_level=str(settings.LOG_LEVEL),
+        log_renderer=str(settings.LOG_RENDERER),
+        debug=settings.DEBUG,
+    )
 
 
 if __name__ == "__main__":
