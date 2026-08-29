@@ -12,6 +12,53 @@ dependencies = [
     "concurrent-log-handler>=0.9.29",
     "pydantic-settings>=2.15.0",
     "structlog>=26.1.0",
+
+    # -------- Database ----------
+    "psycopg>=3.3.4",
+    "sqlalchemy>=2.0.51",
+    "alembic>=1.18.4",
+    "asyncpg>=0.31.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "black>=26.5.1",  # code formatter
+    "isort>=8.0.1",   # import sorter
+    "pylint>=4.0.6",  # code linter
+]
+
+[tool.black]
+line-length = 119
+extend-exclude = "src/data/alembic"
+
+[tool.isort]
+profile = "black"
+line_length = 119
+skip_gitignore = true
+skip = [
+    "src/data/alembic",
+]
+
+[tool.pylint. format]
+max-line-length = 119
+
+[tool.pylint.messages_control]
+disable = [
+    "consider-using-f-string",
+    "too-few-public-methods",
+    "redefined-outer-name",
+    "unused-argument",
+]
+
+[tool.pylint.main]
+ignore = [
+    "venv",
+    "migrations",
+    "__pycache__",
+]
+
+ignore-paths = [
+    "src/data/alembic/.*$",
 ]
 
 # When you are looking for Python packages, consider src/ to be the package root.
@@ -21,3 +68,7 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"

@@ -1,11 +1,12 @@
+import os
 from email.policy import default
 from enum import StrEnum
-import os
 from pathlib import Path
-from dotenv import load_dotenv
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import Field, field_validator, model_validator
 from typing import Optional
+
+from dotenv import load_dotenv
+from pydantic import Field, field_validator, model_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Environment(StrEnum):
@@ -21,10 +22,10 @@ class Environment(StrEnum):
         TEST (str): The test environment.
     """
 
-    DEVELOPMENT = "development" # Local DB, debug logs, mock services
-    STAGING = "staging" # Staging DB/API, production-like setup
-    PRODUCTION = "production" # Real DB, real APIs, strict settings
-    TEST = "test" # Temporary DB, mocked APIs
+    DEVELOPMENT = "development"  # Local DB, debug logs, mock services
+    STAGING = "staging"  # Staging DB/API, production-like setup
+    PRODUCTION = "production"  # Real DB, real APIs, strict settings
+    TEST = "test"  # Temporary DB, mocked APIs
 
 
 class LogLevel(StrEnum):
@@ -54,6 +55,7 @@ class LogRenderer(StrEnum):
         CONSOLE (str): Console log renderer.
         JSON (str): JSON log renderer.
     """
+
     CONSOLE = "console"
     JSON = "json"
 
@@ -65,7 +67,8 @@ def get_enviroment() -> Environment:
     it will be used to load the appropriate .env file only.
 
     Returns:
-        Environment: The current environment (development, staging, production, or test)"""
+        Environment: The current environment (development, staging, production, or test)
+    """
     match os.getenv("APP_ENV", "development").lower():
         case "production" | "prod":
             return Environment.PRODUCTION
@@ -103,26 +106,23 @@ ENV_DEFAULTS = {
     Environment.DEVELOPMENT: {
         "DEBUG": True,
         "LOG_LEVEL": LogLevel.DEBUG,
-        "LOG_RENDERER": LogRenderer.CONSOLE
+        "LOG_RENDERER": LogRenderer.CONSOLE,
     },
-
     Environment.STAGING: {
         "DEBUG": False,
         "LOG_LEVEL": LogLevel.INFO,
-        "LOG_RENDERER": LogRenderer.JSON
+        "LOG_RENDERER": LogRenderer.JSON,
     },
-
     Environment.PRODUCTION: {
         "DEBUG": False,
         "LOG_LEVEL": LogLevel.WARNING,
-        "LOG_RENDERER": LogRenderer.JSON
+        "LOG_RENDERER": LogRenderer.JSON,
     },
-
     Environment.TEST: {
         "DEBUG": True,
         "LOG_LEVEL": LogLevel.DEBUG,
-        "LOG_RENDERER": LogRenderer.CONSOLE
-    }
+        "LOG_RENDERER": LogRenderer.CONSOLE,
+    },
 }
 
 
@@ -131,7 +131,7 @@ class Settings(BaseSettings):
 
     Manages application configuration with support for environment-specific
     settings and validation of environment aliases.
-    
+
     load_dotenv() and SettingsConfigDict(env_file=...) can both read the .env file, but they serve different purposes.
 
     Think of it like this:
@@ -156,14 +156,25 @@ class Settings(BaseSettings):
     DEBUG: Optional[bool] = Field(default=None)
     LOG_LEVEL: Optional[LogLevel] = Field(default=None)
     LOG_RENDERER: Optional[LogRenderer] = Field(default=None)
-    LOG_DIR: Optional[str] = Field(default='storage/logs')
-    LOG_MAX_BYTES: Optional[int] = Field(default= 10 * 1024 * 1024)
+    LOG_DIR: Optional[str] = Field(default="storage/logs")
+    LOG_MAX_BYTES: Optional[int] = Field(default=10 * 1024 * 1024)
     LOG_BACKUP_COUNT: Optional[int] = Field(default=10)
 
+    # ===================================================================
+    # Database (PostgreSQL) Settings
+    # ===================================================================
+    POSTGRES_HOST: str = Field(...)
+    POSTGRES_DB: str = Field(...)
+    POSTGRES_USER: str = Field(...)
+    POSTGRES_PORT: str = Field(...)
+    POSTGRES_PASSWORD: str = Field(...)
+
+    POSTGRES_POOL_SIZE: int = Field(...)
+    POSTGRES_MAX_OVERFLOW: int = Field(...)
 
     @model_validator(mode="after")
     def configure_environment_defaults(self):
-        """After Pydantic has loaded and validated my settings, 
+        """After Pydantic has loaded and validated my settings,
         fill in any missing settings with defaults appropriate for the current environment.
 
         if getattr(self, key, None) is None:
@@ -186,12 +197,14 @@ class Settings(BaseSettings):
         current_env_defaults = ENV_DEFAULTS.get(self.APP_ENV, {})
 
         for key, value in current_env_defaults.items():
-            if getattr(self, key, None) is None: # Does the Settings object already have a value for this setting? self.DEBUG = None
+            if (
+                getattr(self, key, None) is None
+            ):  # Does the Settings object already have a value for this setting? self.DEBUG = None
                 setattr(self, key, value)
 
         return self
 
-    @field_validator("APP_ENV", mode="before") # apply before pydantic validation
+    @field_validator("APP_ENV", mode="before")  # apply before pydantic validation
     @classmethod
     def normalize_environment(cls, value: str) -> str:
         """Normalize APP_ENV aliases to supported environment values
@@ -210,19 +223,17 @@ class Settings(BaseSettings):
             "prod": "production",
             "production": "production",
             "test": "test",
-            "testing": "test"
+            "testing": "test",
         }
 
         normalized_env = aliases.get(str(value).lower())
         if normalized_env is None:
-            raise ValueError(
-                f"Invalid APP_ENV '{value}'"
-                f"Expected one of: {','.join(sorted(aliases.keys()))}"
-            )
+            raise ValueError(f"Invalid APP_ENV '{value}'" f"Expected one of: {','.join(sorted(aliases.keys()))}")
         return normalized_env
 
 
 settings = Settings()
+
 
 def main():
     print(f"welcome from `{os.path.basename(__file__).split('.')[0]}` modeul, nothing to do ^___^!")
@@ -232,4 +243,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

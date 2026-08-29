@@ -1,0 +1,80 @@
+name: web-assistant
+
+# ===================================================================
+# Docker Compose Configuration
+# ===================================================================
+# This file defines all services required to run the
+# application locally or in a single-node environment.
+
+#                      YOUR PC
+# ┌─────────────────────────────────────────────────┐
+# │                                                 │
+# │  Python application                             │
+# │       │                                         │
+# │       │ localhost:5432                          │
+# │       ↓                                         │
+# │  ┌─────────────────────────────────────────┐    │
+# │  │ Docker                                  │    │
+# │  │                                         │    │
+# │  │     backend network                     │    │
+# │  │    ┌──────────────────────────────┐     │    │
+# │  │    │                              │     │    │
+# │  │    │       db container           │     │    │
+# │  │    │                              │     │    │
+# │  │    │ PostgreSQL + pgvector        │     │    │
+# │  │    │                              │     │    │
+# │  │    │ DB: agentic_db               │     │    │
+# │  │    │ ser: admin                   │     │    │
+# │  │    │                              │     │    │
+# │  │    │  /var/lib/postgresql/data    │     │    │
+# │  │    └──────────────────────────────┘     │    │
+# │  │                 │                       │    │
+# │  │                 ↓                       │    │
+# │  │          postgres-data                  │    │
+# │  │          Docker volume                  │    │
+# │  └─────────────────────────────────────────┘    │
+# │                                                 │
+# └─────────────────────────────────────────────────┘
+
+#               Healthcheck
+#                   │
+#                   ↓
+#        pg_isready -U admin -d agentic_db
+#                   │
+#           ┌───────┴───────┐
+#           ↓               ↓
+#        Ready            Not ready
+#           ↓               ↓
+#        healthy         unhealthy
+
+
+services:
+  db: # The name of the service is: db
+    image: pgvector/pgvector:pg16
+    environment: # ${XXX} This means Docker Compose will substitute the value from your environment / Compose .env configuration.
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data # PostgreSQL stores its database files inside:
+    healthcheck: # database will not run before the healthcheck
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"] # pg_isready is a PostgreSQL utility that checks whether the PostgreSQL server is accepting connections.
+      interval: 10s # Docker checks the database every: 10 sec
+      timeout: 5s # Each health check is allowed to run for up to: 5 sec
+      retries: 5
+    restart: always
+    networks: # This controls how your containers communicate with each other.
+      - backend # So the db becomes reachable by other containers attached to backend.
+
+networks:
+  backend: # defining a network called backend
+    driver: bridge # bridge is Docker's standard network driver for containers running on the same Docker host.
+
+volumes:
+  postgres-data:
+
+# test service
+# - in terminal: ```docker compose -f docker/docker-compose.yml up --build db -d```
+# - ```docker ps``` to know the healthy containers
