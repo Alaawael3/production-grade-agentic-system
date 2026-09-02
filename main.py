@@ -7,7 +7,7 @@ from fastapi import FastAPI
 
 from config.settings import settings
 from system.logs import logger
-
+from api.v1 import v1_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -24,8 +24,10 @@ async def lifespan(app: FastAPI):
         # Shutdown
 
 
-app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION, lifespan=lifespan)
+app = FastAPI(title=settings.PROJECT_NAME, version=settings.VERSION, openapi_url=f"{settings.API_VERSION}/openapi.json", lifespan=lifespan)
 
+
+app.include_router(v1_router)
 
 def main():
     print("Hello from production-grade-agentic-system!")

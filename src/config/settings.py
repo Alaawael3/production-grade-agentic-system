@@ -147,6 +147,7 @@ class Settings(BaseSettings):
     APP_ENV: Environment = Field(...)
     PROJECT_NAME: str = Field(..., max_length=100)
     VERSION: str = Field(...)
+    API_VERSION: str = Field(...)
     PROJECT_ROOT: str = Field(...)
     LOG_LEVEL: Optional[str] = Field(default=None)
 
