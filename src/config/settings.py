@@ -173,6 +173,14 @@ class Settings(BaseSettings):
     POSTGRES_POOL_SIZE: int = Field(...)
     POSTGRES_MAX_OVERFLOW: int = Field(...)
 
+    # ===================================================================
+    # JWT (Authenticaiton) Settings
+    # ===================================================================
+    JWT_SECRET_KEY: str = Field(...)
+    JWT_ALGORITHM: str = Field(default="HS256")
+    JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(...)
+    JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(...)
+
     @model_validator(mode="after")
     def configure_environment_defaults(self):
         """After Pydantic has loaded and validated my settings,

@@ -31,7 +31,7 @@ class UserCreate(UserBase):
 
     password: SecretStr = Field(..., min_length=8, max_length=64, description="plain_text password (8-64) character")
 
-    @field_validator
+    @field_validator("password")
     @classmethod
     def validate_password(cls, value: SecretStr) -> SecretStr:
         """Enforce password complexity rules.
@@ -58,6 +58,8 @@ class UserCreate(UserBase):
 
         if not re.search(r"[@#$%^&*(),.?:{}|<>]", password):
             raise ValueError("Password must at least one speecial character")
+
+        return value
 
 
 class UpdateUser(UserBase):
