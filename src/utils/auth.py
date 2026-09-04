@@ -144,8 +144,9 @@ def verify_token(token: str, token_type: str = "access") -> Optional[str]:
             logger.warning("token_type_mismatch", expected=token_type, got=claims.get("type"))
             return None
 
-        logger.depug("token_verified", id=id, token_type=token_type)
+        logger.debug("token_verified", id=id, token_type=token_type)
         return id
+
     except ExpiredSignatureError:
         logger.info("token_expired")
         return None
@@ -208,7 +209,7 @@ async def get_current_user(
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account disabled")
 
-    bind_contextvars(user_id=str(user.id)) # user id will be displayed in logs
+    bind_contextvars(user_id=str(user.id))  # user id will be displayed in logs
     return user
 
 

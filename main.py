@@ -4,10 +4,11 @@ from contextlib import asynccontextmanager
 from sys import version
 
 from fastapi import FastAPI
-
+from data.db_manager import db_manager
 from config.settings import settings
 from system.logs import logger
 from api.v1 import v1_router
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -16,6 +17,9 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("application_startup", project_name=settings.PROJECT_NAME, version=settings.VERSION)
 
+    await db_manager.check_connection()
+    logger.info("database_connection_successful")
+    
     try:
         yield
         # running
