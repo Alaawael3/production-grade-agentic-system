@@ -14,6 +14,7 @@ from data.schemas.base import SQLAlchemyBase
 
 if TYPE_CHECKING:
     from data.schemas.chat_session import ChatSession
+    from data.schemas.user_session import UserSession
 
 
 class User(SQLAlchemyBase):
@@ -50,6 +51,12 @@ class User(SQLAlchemyBase):
     is_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     chat_sessions: Mapped[list["ChatSession"]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+
+    user_sessions: Mapped[list["UserSession"]] = relationship(
+        "UserSession",
         back_populates="user",
         cascade="all, delete-orphan",
     )

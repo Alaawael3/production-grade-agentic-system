@@ -25,8 +25,10 @@ class ChatSessionCreate(ChatSessionBase):
     @classmethod
     def validate_title(cls, value: str) -> str:
         if len(value) > 255:
-            raise ValueError("title length exceeded it have to be less then 255 characters")
-
+            raise ValueError(
+                "title length exceeded; it has to be less than 255 characters"
+            )
+        return value
 
 class ChatSessionUpdate(ChatSessionBase):
     """Schema for partial chat session updates.

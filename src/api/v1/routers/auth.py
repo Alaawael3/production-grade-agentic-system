@@ -3,8 +3,9 @@
 from datetime import UTC, datetime, timedelta
 from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
+from structlog.contextvars import bind_contextvars
 
 from config.settings import settings
 from data.db_manager import db_manager
@@ -13,17 +14,15 @@ from data.models.user import UserCreate, UserRead
 from data.repositories import UserRepository, UserSessionRepository
 from data.schemas.user_session import UserSession
 from system.logs import logger
-from structlog.contextvars import bind_contextvars
 from system.rate_limiting import limiter
-
 from utils.auth import (
     create_token_pair,
-    hash_password,
-    verify_password,
-    verify_token,
     get_current_session,
     get_current_user,
     get_session_id_from_claim,
+    hash_password,
+    verify_password,
+    verify_token,
 )
 
 router = APIRouter()
@@ -50,8 +49,8 @@ async def _start_session(user_id: UUID, db_session: AsyncSession) -> UserSession
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
-@limiter.limits(settings.RATE_LIMIT_REGISTER)
-async def register(payload: UserCreate, db_session: AsyncSession = Depends(db_manager.get_db_session), request: Request, response: Response):
+@limiter.limit(settings.RATE_LIMIT_REGISTER)
+async def register(payload: UserCreate, request: Request, response: Response, db_session: AsyncSession = Depends(db_manager.get_db_session)):
     """Register a new user account and return an authenticated session.
 
     Args:
@@ -87,8 +86,8 @@ async def register(payload: UserCreate, db_session: AsyncSession = Depends(db_ma
 
 
 @router.post("/login", response_model=AuthResponse)
-@limiter.limits(settings.RATE_LIMIT_LOGIN)
-async def login(payload: LoginRequest, db_session: AsyncSession = Depends(db_manager.get_db_session), request: Request, response: Response):
+@limiter.limit(settings.RATE_LIMIT_LOGIN)
+async def login(payload: LoginRequest, request: Request, response: Response, db_session: AsyncSession = Depends(db_manager.get_db_session)):
     """Authenticate with email/password and return a token pair.
 
     Args:
@@ -123,8 +122,8 @@ async def login(payload: LoginRequest, db_session: AsyncSession = Depends(db_man
 
 
 @router.post("/refresh", response_model=Token)
-@limiter.limits(settings.RATE_LIMIT_REFRESH)
-async def refresh(payload: RefreshTokenRequest, db_session: AsyncSession = Depends(db_manager.get_db_session), request: Request, response: Response):
+@limiter.limit(settings.RATE_LIMIT_REFRESH)
+async def refresh(payload: RefreshTokenRequest, request: Request, response: Response, db_session: AsyncSession = Depends(db_manager.get_db_session)):
     """Exchange a valid refresh token for a new token pair.
 
     Args:
@@ -179,8 +178,8 @@ async def refresh(payload: RefreshTokenRequest, db_session: AsyncSession = Depen
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limits(settings.RATE_LIMIT_DEFAULT)
-async def logout(session: UserSession = Depends(get_current_session), db_session: AsyncSession = Depends(db_manager.get_db_session), request: Request, response: Response) -> Response:
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def logout(request: Request, response: Response, session: UserSession = Depends(get_current_session), db_session: AsyncSession = Depends(db_manager.get_db_session)) -> Response:
     """End the current device's session, leaving the user's others running.
 
     The whole rotation chain is revoked rather than just the current row, so a
@@ -202,9 +201,9 @@ async def logout(session: UserSession = Depends(get_current_session), db_session
 
 
 @router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
-@limiter.limits(settings.RATE_LIMIT_DEFAULT)
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
 async def logout_all(
-    user: UserSession = Depends(get_current_user), db_session: AsyncSession = Depends(db_manager.get_db_session), request: Request, response: Response
+    request: Request, response: Response, user: UserSession = Depends(get_current_user), db_session: AsyncSession = Depends(db_manager.get_db_session)
 ) -> Response:
     """End the current user's sessions.
 
@@ -227,8 +226,8 @@ async def logout_all(
 
 
 @router.get("/me", response_model=UserRead)
-@limiter.limits(settings.RATE_LIMIT_DEFAULT)
-async def get_me(user: UserSession = Depends(get_current_user), request: Request, response: Response) -> UserRead:
+@limiter.limit(settings.RATE_LIMIT_DEFAULT)
+async def get_me(request: Request, response: Response, user: UserSession = Depends(get_current_user)) -> UserRead:
     """Return the current user's profile.
 
     Args:

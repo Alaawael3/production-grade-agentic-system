@@ -105,7 +105,7 @@ class UserSessionRepository:
             select(UserSession).options(selectinload(UserSession.user)).where(or_(*conditions))
         )
 
-        return stmt.scalar_one_or_none()
+        return stmt.scalars().first()
 
     async def revoke(self, session_id: UUID) -> int:
         """Revoke a single session, but only if it is still live.
@@ -196,4 +196,3 @@ class UserSessionRepository:
         )
         await self._db_session.flush()  # Ensure the delete is persisted
         return result.rowcount
-    

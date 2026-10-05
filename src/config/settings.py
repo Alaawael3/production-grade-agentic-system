@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Optional
 
 from dotenv import load_dotenv
-from limits.util import parse_many
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -150,7 +149,6 @@ class Settings(BaseSettings):
     VERSION: str = Field(...)
     API_VERSION: str = Field(...)
     PROJECT_ROOT: str = Field(...)
-    LOG_LEVEL: Optional[str] = Field(default=None)
 
     # ===================================================================
     # Logging Settings
@@ -182,25 +180,26 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(...)
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(...)
 
-    SESSION_ABSOLUTE_LIFETIME_DAYS: int = Field(..., description="Absolute lifetime of a session family in days. 0 disables the cap.")
+    SESSION_ABSOLUTE_LIFETIME_DAYS: int = Field(
+        ..., description="Absolute lifetime of a session family in days. 0 disables the cap."
+    )
 
     # ===================================================================
     # Rate Limiting Settings
     # ===================================================================
     # Format: "[count] per [n] [second|minute | hour |day]"
-    # Multiple limits: comma-separated e.g. "5 per minute, 20 per hour"
-    RATE_LIMIT_DEFAULT: str = Field(default="100 per minute")
-    RATE_LIMIT_HEALTH: str = Field(default="300 per minute")
-    RATE_LIMIT_REGISTER: str = Field(default="5 per minute, 20 per hour")
-    RATE_LIMIT_LOGIN: str = Field(default="10 per minute, 50 per hour")
-    RATE_LIMIT_REFRESH: str = Field(default="60 per minute, 500 per hour")
-    RATE_LIMIT_CREATE_CHAT_SESSION: str = Field(default="30 per minute")
-    RATE_LIMIT_GET_CHAT_SESSIONS: str = Field(default="120 per minute")
-    RATE_LIMIT_GET_CHAT_SESSION: str = Field(default="120 per minute")
-    RATE_LIMIT_UPDATE_CHAT_SESSION: str = Field(default="30 per minute")
-    RATE_LIMIT_DELETE_CHAT_SESSION: str = Field(default="20 per minute")
-
-
+    # Multiple limit: comma-separated e.g. "5 per minute, 20 per hour"
+    RATE_LIMIT_DEFAULT: str = Field(default="100/minute")
+    RATE_LIMIT_HEALTH: str = Field(default="300/minute")
+    RATE_LIMIT_REGISTER: str = Field(default="5/minute;20/hour")
+    RATE_LIMIT_LOGIN: str = Field(default="10/minute;50/hour")
+    RATE_LIMIT_REFRESH: str = Field(default="60/minute;500/hour")
+    RATE_LIMIT_CREATE_CHAT_SESSION: str = Field(default="30/minute")
+    RATE_LIMIT_GET_CHAT_SESSIONS: str = Field(default="120/minute")
+    RATE_LIMIT_GET_CHAT_SESSION: str = Field(default="120/minute")
+    RATE_LIMIT_UPDATE_CHAT_SESSION: str = Field(default="30/minute")
+    RATE_LIMIT_DELETE_CHAT_SESSION: str = Field(default="20/minute")
+    
     @model_validator(mode="after")
     def configure_environment_defaults(self):
         """After Pydantic has loaded and validated my settings,
@@ -232,19 +231,6 @@ class Settings(BaseSettings):
                 setattr(self, key, value)
 
         return self
-
-    @model_validator(mode="after")
-    def validate_rate_limit(self):
-        """validate rate limit settings to ensure they are in the correct format."""
-        for field in self.__class__.model_fields_keys():
-            if field.startswith("RATE_LIMIT_"):
-                value = getattr(self, field)
-                try:
-                    parse_many(value)
-                except ValueError as e:
-                    raise ValueError(f"Invalid rate limit format for {field}: {value}") from e
-        return self
-
 
     @field_validator("APP_ENV", mode="before")  # apply before pydantic validation
     @classmethod

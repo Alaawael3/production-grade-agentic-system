@@ -36,6 +36,11 @@ async def create_chat_session(
     Returns:
         ChatSessionRead: The newly created chat session.
     """
+    logger.info(
+        "creating_chat_session",
+        payload_title=payload.title,
+        user_id=current_user.id,
+    )
     chat_session = await ChatSessionRepository(db_session).create(
         user_id=current_user.id, title=payload.title
     )
@@ -169,7 +174,10 @@ async def update_chat_session(
     return ChatSessionRead.model_validate(chat_session)
 
 
-@router.delete("/{session_id}", response_model=ChatSessionRead)
+@router.delete(
+    "/{session_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
 @limiter.limit(settings.RATE_LIMIT_DELETE_CHAT_SESSION)
 async def delete_chat_session(
     request: Request,
@@ -209,5 +217,3 @@ async def delete_chat_session(
         "chat_session_deleted",
         session_id=session_id,
     )
-
-    

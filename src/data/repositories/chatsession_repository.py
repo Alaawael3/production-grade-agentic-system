@@ -19,7 +19,7 @@ class ChatSessionRepository:
     def __init__(self, db_session: AsyncSession) -> None:
         self._db_session = db_session
 
-    async def get(self, session_id: UUID) -> ChatSession:
+    async def get(self, session_id: UUID) -> ChatSession | None:
         """Fetch a single chat session by primary key.
 
         Args :
@@ -28,7 +28,7 @@ class ChatSessionRepository:
         Returns:
         The ``ChatSession`` instance, or ``None`` if not found.
         """
-        return self._db_session.get(ChatSession, session_id)
+        return await self._db_session.get(ChatSession, session_id)
 
     async def get_all(self, user_id: UUID, page: int = 1, page_size: int = 20) -> list[ChatSession]:
         """Fetch a paginated list of chat sessions belonging to a user.
@@ -97,10 +97,10 @@ class ChatSessionRepository:
         Returns :
         True  'if the chat session was deleted, ''False'' if not found.
         """
-        chat_session = self.get(session_id=session_id)
+        chat_session = await self.get(session_id=session_id)
         if chat_session is None:
             return False
 
-        self._db_session.delete(chat_session)
+        await self._db_session.delete(chat_session)
         await self._db_session.flush()
         return True
