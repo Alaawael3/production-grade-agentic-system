@@ -1,19 +1,51 @@
 """Authentication router handling user registration, login, and token refresh flows"""
 
-import email
-from uuid import UUID
+from datetime import UTC, datetime, timedelta
+from uuid import UUID, uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from config.settings import settings
 from data.db_manager import db_manager
 from data.models.auth import AuthResponse, LoginRequest, RefreshTokenRequest, Token
 from data.models.user import UserCreate, UserRead
-from data.repositories.user_repository import UserRepository
+from data.repositories import UserRepository, UserSessionRepository
+from data.schemas.user_session import UserSession
 from system.logs import logger
-from utils.auth import create_token_pair, hash_password, verify_password, verify_token
+from structlog.contextvars import bind_contextvars
+
+from utils.auth import (
+    create_token_pair,
+    hash_password,
+    verify_password,
+    verify_token,
+    get_current_session,
+    get_current_user,
+    get_session_id_from_claim,
+)
 
 router = APIRouter()
+
+
+async def _start_session(user_id: UUID, db_session: AsyncSession) -> UserSession:
+    """Mint a new session family for a fresh login.
+
+    Args:
+        db_session: Injected async database session.
+        user_id: Owner of the new session.
+
+    Returns:
+        The newly created live ''UserSession''
+    """
+    now = datetime.now(UTC)
+    return await UserSessionRepository(db_session=db_session).create(
+        user_id=user_id,
+        family_created_at=now,
+        family_id=uuid4(),
+        expires_at=now
+        + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS),  # Example expiration, adjust as needed
+    )
 
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
@@ -44,8 +76,10 @@ async def register(payload: UserCreate, db_session: AsyncSession = Depends(db_ma
         email=payload.email,
         hashed_password=hash_password(payload.password.get_secret_value()),
     )
+    session = await _start_session(user_id=user.id, db_session=db_session)
+    bind_contextvars(user_id=str(user.id), session_id=str(session.id))
 
-    token = create_token_pair(str(user.id))
+    token = create_token_pair(str(user.id), str(session.id))
     logger.info("user_registered", user_id=str(user.id))
     return AuthResponse(user=UserRead.model_validate(user), token=token)
 
@@ -79,7 +113,8 @@ async def login(payload: LoginRequest, db_session: AsyncSession = Depends(db_man
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Account distabled")
 
-    token = create_token_pair(str(user.id))
+    session = await _start_session(user_id=user.id, db_session=db_session)
+    token = create_token_pair(str(user.id), str(session.id))
     logger.info("login_success", user_id=str(user.id))
     return AuthResponse(user=UserRead.model_validate(user), token=token)
 
@@ -105,22 +140,95 @@ async def refresh(payload: RefreshTokenRequest, db_session: AsyncSession = Depen
         headers={"WWW-Authenticate": "Bearer"},
     )
 
-    user_id = verify_token(payload.refresh_token, token_type="refresh")
-
-    if user_id is None:
+    claims = verify_token(payload.refresh_token, token_type="refresh")
+    if claims is None:
         raise credentials_exception
 
-    try:
-        uid = UUID(user_id)
-    except ValueError:
+    session_id = get_session_id_from_claim(claims)
+    if session_id is None:
         raise credentials_exception
 
-    user = await UserRepository(db_session=db_session).get(uid)
-    if user is None:
+    repo = UserSessionRepository(db_session=db_session)
+    session = await repo.get_live(session_id)
+    if session is None:
+        existing_session = await repo.get(session_id)
+        if existing_session is not None and existing_session.revoked_at is not None:
+            await repo.revoke_family(existing_session.family_id)
+            logger.warning("refresh_token_revoked", session_id=str(session_id), family_id=str(existing_session.family_id))
         raise credentials_exception
 
+    user = session.user
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN)
 
-    logger.info("token_refreshed", user_id=str(user.id))
-    return create_token_pair(str(user.id))
+    await repo.revoke(session.id)
+    new_session = await repo.create(
+        user_id=user.id,
+        family_id=session.family_id,
+        family_created_at=session.family_created_at,
+        expires_at=datetime.now(UTC) + timedelta(days=settings.JWT_REFRESH_TOKEN_EXPIRE_DAYS),
+    )
+
+    logger.info("refresh_token_success", user_id=str(user.id), old_session_id=str(session.id), new_session_id=str(new_session.id))
+    bind_contextvars(user_id=str(user.id), session_id=str(new_session.id))
+    return create_token_pair(str(user.id), str(new_session.id))
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
+async def logout(session: UserSession = Depends(get_current_session), db_session: AsyncSession = Depends(db_manager.get_db_session)) -> Response:
+    """End the current device's session, leaving the user's others running.
+
+    The whole rotation chain is revoked rather than just the current row, so a
+    stale refresh token from this device later reads as an ordinary dead session
+    instead of raising a reuse alarm.
+
+    Args:
+        request: Incoming request, required by the rate limiter.
+        session: The live session behind the request.
+        db_session: Injected async database session.
+
+    Returns:
+        An empty 204 response.
+    """
+
+    revoked = await UserSessionRepository(db_session=db_session).revoke_family(session.family_id)
+    logger.info("logout_success", user_id=str(session.user_id), session_id=str(session.id), family_id=str(session.family_id), revoked_count=revoked)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.post("/logout-all", status_code=status.HTTP_204_NO_CONTENT)
+async def logout_all(
+    user: UserSession = Depends(get_current_user), db_session: AsyncSession = Depends(db_manager.get_db_session)
+) -> Response:
+    """End the current user's sessions.
+
+    Args:
+        request: Incoming request, required by the rate limiter.
+        user: The current user.
+        db_session: Injected async database session.
+
+    Returns:
+        An empty 204 response.
+    """
+
+    revoked = await UserSessionRepository(db_session=db_session).revoke_all(user.id)
+    logger.info(
+        "all_sessions_closed",
+        user_id=str(user.id),
+        revoked_count=revoked,
+    )
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@router.get("/me", response_model=UserRead)
+async def get_me(user: UserSession = Depends(get_current_user)) -> UserRead:
+    """Return the current user's profile.
+
+    Args:
+        user: The current user, injected by FastAPI.
+
+    Returns:
+        The current user's profile.
+    """
+    return UserRead.model_validate(user)
+
