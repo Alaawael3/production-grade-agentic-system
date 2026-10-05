@@ -11,6 +11,7 @@ from config.settings import settings
 from data.db_manager import db_manager
 from system.logs import logger
 from system.rate_limiting import limiter
+from system.middleware import RequestContextMiddleware
 
 
 @asynccontextmanager
@@ -42,7 +43,7 @@ app = FastAPI(
 app.include_router(v1_router)
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-
+app.add_middleware(RequestContextMiddleware)
 
 def main():
     print("Hello from production-grade-agentic-system!")
