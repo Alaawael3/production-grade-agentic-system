@@ -21,7 +21,7 @@ class ChatSessionCreate(ChatSessionBase):
     Inherits ''title'' from 'ChatSessionBase'' with no additional fields.
     """
 
-    @field_validator
+    @field_validator("title")
     @classmethod
     def validate_title(cls, value: str) -> str:
         if len(value) > 255:

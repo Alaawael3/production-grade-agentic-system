@@ -1,6 +1,7 @@
 """User Table"""
 
 from datetime import datetime
+from turtle import update
 from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
@@ -55,4 +56,4 @@ class User(SQLAlchemyBase):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), onupdate=func.now(), nullable=True)

@@ -3,7 +3,6 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from data.schemas import chat_session
 from data.schemas.chat_session import ChatSession
 
 
@@ -27,7 +26,7 @@ class ChatSessionRepository:
         chat_session_id: UUID of the chat session to retrieve.
 
         Returns:
-        The 'ChatSession'' instance, or 'None'' if not found.
+        The ``ChatSession`` instance, or ``None`` if not found.
         """
         return self._db_session.get(ChatSession, session_id)
 
@@ -54,7 +53,7 @@ class ChatSessionRepository:
         """Insert a new chat session row.
 
         Args
-            ** kwargs: Column values matching ''ChatSession'' ORM fields
+            **kwargs: Column values matching ''ChatSession'' ORM fields
             (e.g. ''title'', ''user_id'').
 
         Returns :

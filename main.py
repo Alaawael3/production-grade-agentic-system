@@ -12,7 +12,7 @@ from api.v1 import v1_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handle application startup and shutdown lifecycle"""
+    """Handle application stardtup and shutdown lifecycle"""
 
     # Startup
     logger.info("application_startup", project_name=settings.PROJECT_NAME, version=settings.VERSION)

@@ -1,4 +1,4 @@
-"""api v1 routers pachaeg"""
+"""api v1 routers pachage"""
 
 from .auth import router as auth_router
 from .base import router as base_router

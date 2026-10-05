@@ -181,6 +181,8 @@ class Settings(BaseSettings):
     JWT_ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(...)
     JWT_REFRESH_TOKEN_EXPIRE_DAYS: int = Field(...)
 
+    SESSION_ABSOLUTE_LIFETIME_DAYS: int = Field(..., description="Absolute lifetime of a session family in days. 0 disables the cap.")
+
     @model_validator(mode="after")
     def configure_environment_defaults(self):
         """After Pydantic has loaded and validated my settings,
